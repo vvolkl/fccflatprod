@@ -23,11 +23,15 @@ selectedComponents = [
                       p8_ee_WW_ecm240
 		      ]
 
+
+comp=p8_ee_ZH_ecm240
+#print comp
+
 p8_ee_ZH_ecm240.splitFactor = 10
 p8_ee_ZZ_ecm240.splitFactor = 10
 p8_ee_WW_ecm240.splitFactor = 10
 
-selectedComponents = [comp]
+#selectedComponents = [comp]
 
 
 from FCCeeAnalyses.analyzers.Reader import Reader
