@@ -9,7 +9,7 @@ class PtIsoSelector:
     #self.filter_func = kwargs["filter_func"]
 
   def doit(self, dataframe):
-    print "PtIsoSelector doit"
+    ##print "PtIsoSelector doit"
     #select_leptons_add_to_dataframe(dataframe)
     return dataframe
     

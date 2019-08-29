@@ -3,4 +3,5 @@ class Looper:
     self.event = 1  
     pass
   def process(self,a):
-    print a
+    #print a
+    pass

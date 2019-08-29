@@ -22,29 +22,27 @@ print "done"
 import ROOT
 
 #TODO: change library name
+print "Load cxx analyzers ... ",
 ROOT.gSystem.Load("fcc_ana_ZH_Zmumu_cxx")
+print ""
 
 
+print "Parsing config file " , sys.argv[1], " ... ",
 if __name__ == "__main__":
   execfile(sys.argv[1])
+print "done"
 
 
-global df
+print "Create dataframe object from ", comp.files[0], " ... ", 
 df = ROOT.RDataFrame("events", comp.files[0])
 df = ROOT.initial_dataframe_convert(df)
-print df
-
-if False: 
-  from ROOT import select_leptons_add_to_dataframe 
-  from ROOT import initial_dataframe_convert
-  df = select_leptons_add_to_dataframe(df, "muons", "muonITags", "selected_muons")
-  print df
-  df = recoil_add_to_dataframe(df, "muons",  "recoil")
-  print df
+print " done"
 
 
+print "Running Sequence of Analyzers ...",
 for ana in sequence.the_sequence:
-  print ana
   df = ana.doit(df)
+print " done"
 
+print "New Columns: ",
 print df.GetDefinedColumnNames()

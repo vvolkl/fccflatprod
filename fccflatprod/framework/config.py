@@ -5,8 +5,8 @@ class Component():
 
 class Analyzer:
   def __init__(self, the_analyzer, *args, **kwargs):
-    print args
-    print kwargs
+    #print args
+    #print kwargs
     self.the_analyzer = the_analyzer(*args, **kwargs)
     pass
   def doit(self, dataframe):

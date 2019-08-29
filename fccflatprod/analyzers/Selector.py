@@ -9,7 +9,7 @@ class Selector:
     self.filter_func = kwargs["filter_func"]
 
   def doit(self, dataframe):
-    print "Selector doit"
+    ##print "Selector doit"
     #select_leptons_add_to_dataframe(dataframe)
     return dataframe
     
