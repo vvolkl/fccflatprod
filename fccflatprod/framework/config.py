@@ -8,6 +8,7 @@ class Analyzer:
     #print args
     #print kwargs
     self.the_analyzer = the_analyzer(*args, **kwargs)
+    self.kwargs = kwargs
     pass
   def doit(self, dataframe):
     dataframe = self.the_analyzer.doit(dataframe)

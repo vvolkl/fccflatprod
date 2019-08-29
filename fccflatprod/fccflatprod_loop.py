@@ -23,6 +23,7 @@ import ROOT
 
 #TODO: change library name
 print "Load cxx analyzers ... ",
+ROOT.gSystem.Load("libdatamodel")
 ROOT.gSystem.Load("fcc_ana_ZH_Zmumu_cxx")
 print ""
 
@@ -38,11 +39,25 @@ df = ROOT.RDataFrame("events", comp.files[0])
 df = ROOT.initial_dataframe_convert(df)
 print " done"
 
+branchList = []
 
 print "Running Sequence of Analyzers ...",
 for ana in sequence.the_sequence:
+  if "write_to_file" in ana.kwargs:
+    if ana.kwargs["write_to_file"]:
+      branchList.append(ana.kwargs["output"])
   df = ana.doit(df)
 print " done"
 
 print "New Columns: ",
 print df.GetDefinedColumnNames()
+
+
+branchListRoot = ROOT.vector('string')()
+for branchName in branchList:
+    branchListRoot.push_back(branchName)
+
+
+print "Writing output to file  tree.root ... ",
+df.Snapshot("events", "tree.root", branchListRoot)
+print "done"

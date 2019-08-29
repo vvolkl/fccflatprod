@@ -41,19 +41,19 @@ double deltaR(fcc::LorentzVector v1, fcc::LorentzVector v2) {
 struct recoil {
   recoil(float arg_sqrts) : m_sqrts(arg_sqrts) {};
   float m_sqrts = 240.0;
-  std::vector<fcc::LorentzVector> operator() (std::vector<fcc::ParticleData> in) {
-      std::vector<fcc::LorentzVector> result;
+  std::vector<fcc::ParticleData> operator() (std::vector<fcc::ParticleData> in) {
+      std::vector<fcc::ParticleData> result;
       auto recoil_p4 = TLorentzVector(0, 0, 0, m_sqrts);
       for (auto & v1: in) {
         TLorentzVector tv1;
         tv1.SetXYZM(v1.core.p4.px, v1.core.p4.py, v1.core.p4.pz, v1.core.p4.mass);
         recoil_p4 -= tv1;
       }
-      auto recoil_fcc = fcc::LorentzVector();
-      recoil_fcc.px = recoil_p4.Px();
-      recoil_fcc.py = recoil_p4.Py();
-      recoil_fcc.pz = recoil_p4.Pz();
-      recoil_fcc.mass = recoil_p4.M();
+      auto recoil_fcc = fcc::ParticleData();
+      recoil_fcc.core.p4.px = recoil_p4.Px();
+      recoil_fcc.core.p4.py = recoil_p4.Py();
+      recoil_fcc.core.p4.pz = recoil_p4.Pz();
+      recoil_fcc.core.p4.mass = recoil_p4.M();
       result.push_back(recoil_fcc);
       return result;
   }
@@ -62,8 +62,27 @@ dataframe_return_type recoil_add_to_dataframe( dataframe_arg_type df, std::strin
   return df.Define(output_column, recoil(sqrts), {input_column});
 }
 
-struct selectLeptons {
-  selectLeptons(float arg_min_pt, float arg_max_iso) : m_min_pt(arg_min_pt), m_max_iso(arg_max_iso) {};
+struct selectParticlesPt {
+  selectParticlesPt(float arg_min_pt) : m_min_pt(arg_min_pt) {};
+  float m_min_pt = 20;
+  std::vector<fcc::ParticleData>  operator() (std::vector<fcc::ParticleData> in) {
+    std::vector<fcc::ParticleData> result;
+    result.reserve(in.size());
+    for (size_t i = 0; i < in.size(); ++i) {
+      auto & p = in[i];
+      if (std::sqrt(std::pow(p.core.p4.px,2) + std::pow(p.core.p4.py,2)) > m_min_pt) {
+        result.emplace_back(p);
+      }
+    }
+    return result;
+  }
+};
+dataframe_return_type selectParticlesPt_add_to_dataframe( dataframe_arg_type df, std::string input_column, std::string output_column, float min_pt=20.) {
+  return df.Define(output_column, selectParticlesPt(min_pt), {input_column});
+}
+
+struct selectParticlesPtIso {
+  selectParticlesPtIso(float arg_min_pt, float arg_max_iso) : m_min_pt(arg_min_pt), m_max_iso(arg_max_iso) {};
   float m_min_pt = 20;
   float m_max_iso = 0.4;
   std::vector<fcc::ParticleData>  operator() (std::vector<fcc::ParticleData> in, std::vector<fcc::TaggedParticleData> iso) {
@@ -80,8 +99,8 @@ struct selectLeptons {
     return result;
   }
 };
-dataframe_return_type select_leptons_add_to_dataframe( dataframe_arg_type df, std::string input_column, std::string input_column_iso, std::string output_column, float min_pt=20., float max_iso=0.2) {
-  return df.Define(output_column, selectLeptons(min_pt, max_iso), {input_column, input_column_iso});
+dataframe_return_type selectParticlesPtIso_add_to_dataframe( dataframe_arg_type df, std::string input_column, std::string input_column_iso, std::string output_column, float min_pt=20., float max_iso=0.2) {
+  return df.Define(output_column, selectParticlesPtIso(min_pt, max_iso), {input_column, input_column_iso});
 }
 
 struct selectJets {
@@ -139,6 +158,60 @@ dataframe_return_type noMatchJets_add_to_dataframe(dataframe_arg_type df, std::s
   return df.Define(output_column, noMatchJets(max_rel_iso) , {input_column, input_column_matchParticles});
 }
 
+struct selectJetsMatchPtTag {
+  float m_max_rel_iso;
+  float m_min_pt;
+  bool m_btag_must_be_zero;
+  selectJetsMatchPtTag(float arg_min_pt, float arg_max_rel_iso, bool arg_btag_must_be_zero) {m_min_pt = arg_min_pt; m_max_rel_iso = arg_max_rel_iso, m_btag_must_be_zero = arg_btag_must_be_zero;} 
+std::vector<fcc::JetData> operator()(std::vector<fcc::JetData> in, std::vector<fcc::TaggedJetData> btags, std::vector<fcc::ParticleData> matchParticles) {
+  std::vector<fcc::JetData> result;
+  result.reserve(in.size());
+  for (size_t i = 0; i < in.size(); ++i) {
+    auto & p = in[i];
+    // check for min pt
+    if (std::sqrt(std::pow(p.core.p4.px,2) + std::pow(p.core.p4.py,2)) > m_min_pt) {
+      // check if can be matched to matchParticles
+      bool matched = false;
+      for (size_t j = 0; j < matchParticles.size(); ++j) {
+        auto & matchCandidate = matchParticles[j];
+        if (deltaR(p.core.p4, matchCandidate.core.p4) < m_max_rel_iso) {
+          matched = true;
+        }
+      }
+      if (matched == false ) {
+        // check for btags
+        if (m_btag_must_be_zero) {
+          if (btags[i].tag > 0) {
+            //yes
+            result.emplace_back(p);
+          }
+        } else {
+          if (btags[i].tag == 0) {
+            //yes
+            result.emplace_back(p);
+          }
+        }
+      }
+    }
+  }
+  return result;
+}
+};
+dataframe_return_type selectJetsMatchPtTag_add_to_dataframe(dataframe_arg_type df, std::string input_column, std::string input_column_btags, std::string input_column_matchParticles, std::string output_column, float arg_min_pt=20, float arg_max_rel_iso = 0.2, bool arg_btag_must_be_zero=false) {
+  return df.Define(output_column, selectJetsMatchPtTag(arg_min_pt, arg_max_rel_iso, arg_btag_must_be_zero), {input_column, input_column_btags, input_column_matchParticles});
+}
+
+std::vector<float> get_pt_lv(std::vector<fcc::LorentzVector> in){
+ std::vector<float> result;
+ for (size_t i = 0; i < in.size(); ++i) {
+   result.push_back(sqrt(in[i].px * in[i].px + in[i].py * in[i].py));
+ }
+ return result;
+}
+dataframe_return_type get_pt_lv_add_to_dataframe(dataframe_arg_type df, std::string input_column, std::string output_column) {
+  return df.Define(output_column, get_pt_lv, {input_column});
+}
+
 std::vector<float> get_pt(std::vector<fcc::ParticleData> in){
  std::vector<float> result;
  for (size_t i = 0; i < in.size(); ++i) {
@@ -146,7 +219,6 @@ std::vector<float> get_pt(std::vector<fcc::ParticleData> in){
  }
  return result;
 }
-
 dataframe_return_type get_pt_add_to_dataframe(dataframe_arg_type df, std::string input_column, std::string output_column) {
   return df.Define(output_column, get_pt, {input_column});
 }
@@ -234,7 +306,6 @@ int get_nparticles(std::vector<fcc::ParticleData> x) {
   int result =  x.size();
   return result;
 }
-
 dataframe_return_type get_nparticles_add_to_dataframe(dataframe_arg_type df, std::string input_column, std::string output_column) {
   return df.Define(output_column, get_nparticles, {input_column});
 }
@@ -243,7 +314,6 @@ int get_njets(std::vector<fcc::JetData> x) {
   int result =  x.size();
   return result;
 }
-
 dataframe_return_type get_njets_add_to_dataframe(dataframe_arg_type df, std::string input_column, std::string output_column) {
   return df.Define(output_column, get_njets, {input_column});
 }
@@ -252,9 +322,8 @@ int get_njets2(std::vector<fcc::JetData> x, std::vector<fcc::JetData> y) {
   int result =  x.size() + y.size();
   return result;
 }
-
-dataframe_return_type add_njets2_to_dataframe(dataframe_arg_type df, std::string input_column, std::string output_column) {
-  return df.Define(output_column, get_njets2, {input_column});
+dataframe_return_type add_njets2_to_dataframe(dataframe_arg_type df, std::string input_column1, std::string input_column2, std::string output_column) {
+  return df.Define(output_column, get_njets2, {input_column1, input_column2});
 }
 
 
@@ -262,7 +331,6 @@ dataframe_return_type add_njets2_to_dataframe(dataframe_arg_type df, std::string
 
 
 
-/*
 
 // Reproduce Heppy analysis
 int main(int argc, char* argv[]){
@@ -301,15 +369,13 @@ int main(int argc, char* argv[]){
 
 
 
-  //auto noMatchJets_02 =  [&] (std::vector<fcc::JetData> in, std::vector<fcc::ParticleData> matchParticles) {return noMatchJets(in, matchParticles, 0.2);};
-  auto noMatchJets_02 = noMatchJets(0.2);
 
 
 
    std::cout << "Apply selectors and define new branches ..." << std::endl;
    auto selectors =  df
-                      .Define("selected_electrons", selectLeptons(20, 0.4), {"electrons", "electronITags"})
-                      .Define("selected_muons", selectLeptons(20, 0.4), {"muons", "muonITags"})
+                      .Define("selected_electrons", selectParticlesPtIso(20, 0.4), {"electrons", "electronITags"})
+                      .Define("selected_muons", selectParticlesPtIso(20, 0.4), {"muons", "muonITags"})
                       .Define("selected_leptons", mergeParticles, {"selected_electrons", "selected_muons"})
                       .Define("zeds", ResonanceBuilder(23, 91.1), {"selected_leptons"})
                       .Define("recoil", recoil(240.0), {"zeds"})
@@ -320,8 +386,8 @@ int main(int argc, char* argv[]){
                       .Define("higgs_pt", get_pt, {"higgs"})
                       .Define("jets_30_bs", selectJets(20, false), {"pfjets", "pfbTags"})
                       .Define("jets_30_lights", selectJets(20, true), {"pfjets", "pfbTags"})
-                      .Define("selected_bs", noMatchJets_02, {"jets_30_bs", "selected_leptons"})
-                      .Define("selected_lights", noMatchJets_02, {"jets_30_lights", "selected_leptons"})
+                      .Define("selected_bs", noMatchJets(0.2), {"jets_30_bs", "selected_leptons"})
+                      .Define("selected_lights", noMatchJets(0.2), {"jets_30_lights", "selected_leptons"})
                       .Define("nbjets", get_njets, {"selected_bs"})
                       .Define("njets", get_njets2, {"selected_bs", "selected_lights"})
                       .Define("weight", id_float, {"mcEventWeights"})
@@ -346,11 +412,11 @@ int main(int argc, char* argv[]){
       "higgs_m",
       "nbjets",
       "njets",
-      "weight"
+      "weight",
+      "met",
 
       }
     );
 
    return 0;
 }
-*/
