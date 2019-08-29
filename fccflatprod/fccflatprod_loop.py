@@ -34,8 +34,13 @@ if __name__ == "__main__":
 print "done"
 
 
-print "Create dataframe object from ", comp.files[0], " ... ", 
-df = ROOT.RDataFrame("events", comp.files[0])
+
+
+fileListRoot = ROOT.vector('string')()
+for fileName in comp.files:
+    fileListRoot.push_back(fileName)
+print "Create dataframe object from ", comp.files, " ... ", 
+df = ROOT.RDataFrame("events", fileListRoot)
 df = ROOT.initial_dataframe_convert(df)
 print " done"
 
