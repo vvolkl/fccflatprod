@@ -24,7 +24,8 @@ class Config():
     pass
 
 class MCComponent():
-  def __init__(self, name , files, **kwargs):
-    pass
-      
+  def __init__(self, name , files, tree_name=None, triggers=None, **kwargs):
+      self.name = name
+      self.files = files
+
 
